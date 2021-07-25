@@ -27,9 +27,10 @@ namespace OrderPizza
         public const string EditPizzas = "Edit Pizzas";
         public const string EditToppings = "Edit Toppings";
         public const string EditSizes = "Edit Sizes";
+        public const string RestoreDefaults = "Restore Defaults";
 
         public static List<string> SettingsMenuSelections = new List<string>
-            { EditPizzas, EditToppings, EditSizes, Back };
+            { EditPizzas, EditToppings, EditSizes, RestoreDefaults, Back };
         #endregion
 
         #region AddRemoveSelections

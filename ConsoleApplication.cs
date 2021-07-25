@@ -36,7 +36,7 @@ namespace OrderPizza
                         SaveOrder();
                         break;
                     case Selections.LoadSavedOrder:
-                        LoadOrder();
+                        LoadSavedOrder();
                         break;
                     case Selections.DeleteSavedOrder:
                         DeleteSavedOrders();
@@ -101,7 +101,11 @@ namespace OrderPizza
             }
             else
             {
-                Order.Items.RemoveAt(_display.GetItem(Order.Items));
+                int selection = _display.GetItem(Order.Items);
+                if (_display.Confirm("You can't recover the pizza once it's deleted"))
+                {
+                    Order.Items.RemoveAt(selection);
+                }
             }
         }
 
@@ -117,7 +121,7 @@ namespace OrderPizza
             Order = new();
         }
 
-        private void LoadOrder()
+        private void LoadSavedOrder()
         {
             List<string> orders = Order.GetSavedOrders(Config.OrdersPath);
             if (orders.Count == 0)
@@ -168,21 +172,35 @@ namespace OrderPizza
 
         private void Settings()
         {
+            if (!_display.Confirm("Entering the settings will result in deleting all the saved orders"))
+            {
+                return;
+            }
+
+            Order = new();
+            if (Directory.Exists(Config.OrdersPath))
+            {
+                Directory.Delete(Config.OrdersPath, true);
+            }
+
             while (true)
             {
                 switch (_display.Choose(Selections.SettingsMenuSelections))
                 {
                     case Selections.EditPizzas:
-                        Config.Pizzas = EditList("Pizza", "Price", Config.Pizzas.ToList<Component>())
+                        Config.Pizzas = EditList(Config.Pizzas.ToList<Component>(), "Pizza", "Price")
                             .Select(x => new Pizza(x.Name, x.Price)).ToList();
                         break;
                     case Selections.EditToppings:
-                        Config.Toppings = EditList("Topping", "Price", Config.Toppings.ToList<Component>())
+                        Config.Toppings = EditList(Config.Toppings.ToList<Component>(), "Topping", "Price")
                             .Select(x => new Topping(x.Name, x.Price)).ToList();
                         break;
                     case Selections.EditSizes:
-                        Config.Sizes = EditList("Size", "Multiplier", Config.Sizes.ToList<Component>())
+                        Config.Sizes = EditList(Config.Sizes.ToList<Component>(), "Size", "Multiplier")
                             .Select(x => new Size(x.Name, x.Price)).ToList();
+                        break;
+                    case Selections.RestoreDefaults:
+                        _configProvider.Config = Config.Default;
                         break;
                     default:
                         return;
@@ -191,45 +209,28 @@ namespace OrderPizza
             }
         }
 
-        private List<Component> EditList(string itemName, string priceName, List<Component> list)
+        private List<Component> EditList(List<Component> list, string stringName, string intName)
         {
             while (true)
             {
-                switch (_display.EditComponent(list.Select(x => (x.Name, x.Price)), itemName, priceName))
+                switch (_display.EditComponent(list.Select(x => (x.Name, x.Price)), stringName, intName))
                 {
                     case Selections.Add:
-                        AddToList(itemName, priceName, list);
+                        string name = _display.GetName(stringName, list.Select(x => x.Name));
+                        double price = _display.GetNumber(stringName, intName);
+                        list.Add(new Component(name, price));
                         break;
                     case Selections.Remove:
-                        RemoveFromList(list);
+                        List<string> names = _display.GetNames(list.Select(x => x.Name));
+                        if (_display.Confirm("You can't recover the " + stringName.ToLower() + " once it's deleted"))
+                        {
+                            list.RemoveAll(x => names.Contains(x.Name));
+                        }
                         break;
                     default:
                         return list;
                 }
             }
-        }
-
-        private void AddToList(string itemName, string priceName, List<Component> list)
-        {
-            string name = _display.GetName(itemName, list.Select(x => x.Name));
-            double price = _display.GetNumber(itemName, priceName);
-            list.Add(new Component(name, price));
-            _configProvider.SaveConfig();
-        }
-
-        private void RemoveFromList(List<Component> list)
-        {
-            List<string> names = _display.GetNames(list.Select(x => x.Name).ToList());
-            if (names.Count > 0)
-            {
-                Order = new();
-                if (Directory.Exists(Config.OrdersPath))
-                {
-                    Directory.Delete(Config.OrdersPath, true);
-                }
-            }
-            list.RemoveAll(x => names.Contains(x.Name));
-            _configProvider.SaveConfig();
         }
     }
 }
