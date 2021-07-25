@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Spectre.Console;
 
@@ -44,47 +43,42 @@ namespace OrderPizza
             return AnsiConsole.Prompt(new SelectionPrompt<string>().AddChoices(Selections.MainMenuSelections));
         }
 
-        public string GetPizza(List<Pizza> pizzas)
+        public string Choose(IEnumerable<string> choices)
         {
             SelectionPrompt<string> prompt = new SelectionPrompt<string>()
-                .AddChoices(pizzas.Select(p => $"{p.Name} [lime](${p.Price})[/]"));
+                .AddChoices(choices);
 
             AnsiConsole.Clear();
-            string[] selection = AnsiConsole
-                .Prompt(prompt).Split(' ');
-
-            return string.Join(' ', selection.Take(selection.Length - 1));
+            return AnsiConsole.Prompt(prompt);
         }
 
-        public List<string> GetToppings(List<Topping> toppings)
+        public List<string> ChooseMultiple(IEnumerable<string> choices)
         {
             MultiSelectionPrompt<string> prompt = new MultiSelectionPrompt<string>()
-                .AddChoices(toppings.Select(p => $"{p.Name} [lime](${p.Price})[/]"))
+                .AddChoices(choices)
                 .NotRequired();
 
             AnsiConsole.Clear();
-            List<string[]> selections = AnsiConsole
-                .Prompt(prompt).Select(x => x.Split(' ')).ToList();
-
-            return selections.Select(x => string.Join(' ', x.Take(x.Length - 1))).ToList();
+            return AnsiConsole.Prompt(prompt);
         }
 
-        public string GetSize(List<Size> sizes, double price)
+        public string ChooseWithPrice(IEnumerable<(string name, double price)> choices)
         {
-            SelectionPrompt<string> prompt = new SelectionPrompt<string>()
-                .AddChoices(sizes.Select(p => $"{p.Name} [lime](${price * p.Multiplier})[/]"));
-
-            AnsiConsole.Clear();
-            string[] selection = AnsiConsole
-                .Prompt(prompt).Split(' ');
-
+            string[] selection = Choose(choices.Select(x => $"{x.name} [lime](${x.price})[/]")).Split(' ');
             return string.Join(' ', selection.Take(selection.Length - 1));
         }
 
-        public void NotAvailable(string name, string error)
+        public List<string> ChooseMultipleWithPrice(IEnumerable<(string name, double price)> choices)
+        {
+            List<string[]> selections = ChooseMultiple(choices.Select(x => $"{x.name} [lime](${x.price})[/]"))
+                .Select(x => x.Split(' ')).ToList();
+            return selections.Select(x => string.Join(' ', x.Take(x.Length - 1))).ToList();
+        }
+
+        public void Error(string message)
         {
             SelectionPrompt<string> prompt = new SelectionPrompt<string>()
-                .Title($"[red bold]No {name} {error}![/]")
+                .Title($"[red bold]{message}[/]")
                 .AddChoices("Press any key to continue...");
             prompt.HighlightStyle("dim italic silver");
 
@@ -120,16 +114,6 @@ namespace OrderPizza
                         ValidationResult.Error($"[red]Invalid selection {index}[/]"))) - 1;
         }
 
-        public string GetOrderName(string OrdersLocation)
-        {
-            AnsiConsole.Clear();
-            return AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter a name for the order")
-                    .Validate(name => File.Exists(Path.Combine(OrdersLocation, name + ".json")) ?
-                        ValidationResult.Error($"[red]A file with the same name already exists[/]") :
-                        ValidationResult.Success()));
-        }
-
         public string GetOrder(List<string> orders)
         {
             SelectionPrompt<string> prompt = new SelectionPrompt<string>()
@@ -139,25 +123,19 @@ namespace OrderPizza
             return AnsiConsole.Prompt(prompt);
         }
 
-        public string SettingsMenu()
-        {
-            AnsiConsole.Clear();
-            return AnsiConsole.Prompt(new SelectionPrompt<string>().AddChoices(Selections.SettingsMenuSelections));
-        }
-
-        public string EditPizzas(List<Pizza> pizzas)
+        public string EditComponent(IEnumerable<(string name, double price)> available, string name, string priceName)
         {
             Table orderTable = new Table()
                 .Border(TableBorder.Rounded)
-                .Title("[underline]Edit Pizzas[/]")
-                .AddColumn(new TableColumn("Pizza"))
-                .AddColumn(new TableColumn("Price").Centered())
+                .Title($"[underline]Edit {name}[/]")
+                .AddColumn(new TableColumn(name))
+                .AddColumn(new TableColumn(priceName).Centered())
                 .Expand();
 
-            foreach (var pizza in pizzas)
+            foreach (var item in available)
             {
-                string nameMarkup = $"[bold lightsteelblue]{pizza.Name}[/]";
-                string priceMarkup = $"[bold lime]${pizza.Price}[/]";
+                string nameMarkup = $"[bold lightsteelblue]{item.name}[/]";
+                string priceMarkup = $"[bold silver]{item.price}[/]";
                 orderTable.AddRow(new Markup(nameMarkup), new Markup(priceMarkup));
             }
 
@@ -166,64 +144,23 @@ namespace OrderPizza
             return AnsiConsole.Prompt(new SelectionPrompt<string>().AddChoices(Selections.AddRemoveSelections));
         }
 
-        public string EditToppings(List<Topping> toppings)
+        public bool Confirm(string message)
         {
-            Table orderTable = new Table()
-                .Border(TableBorder.Rounded)
-                .Title("[underline]Edit Toppings[/]")
-                .AddColumn(new TableColumn("Topping"))
-                .AddColumn(new TableColumn("Price").Centered())
-                .Expand();
-
-            foreach (var topping in toppings)
-            {
-                string nameMarkup = $"[bold lightsteelblue]{topping.Name}[/]";
-                string priceMarkup = $"[bold lime]${topping.Price}[/]";
-                orderTable.AddRow(new Markup(nameMarkup), new Markup(priceMarkup));
-            }
+            SelectionPrompt<string> confirmPrompt = new SelectionPrompt<string>()
+                .Title($"[bold red]{message}[/]")
+                .AddChoices(Selections.OkBackSelections);
 
             AnsiConsole.Clear();
-            AnsiConsole.Render(orderTable);
-            return AnsiConsole.Prompt(new SelectionPrompt<string>().AddChoices(Selections.AddRemoveSelections));
+            return (AnsiConsole.Prompt(confirmPrompt) == Selections.Ok);
         }
 
-        public string EditSizes(List<Size> sizes)
-        {
-            Table orderTable = new Table()
-                .Border(TableBorder.Rounded)
-                .Title("[underline]Edit Sizes[/]")
-                .AddColumn(new TableColumn("Size"))
-                .AddColumn(new TableColumn("Multiplier").Centered())
-                .Expand();
-
-            foreach (var size in sizes)
-            {
-                string nameMarkup = $"[bold lightsteelblue]{size.Name}[/]";
-                string multiplierMarkup = $"[bold silver]x{size.Multiplier}[/]";
-                orderTable.AddRow(new Markup(nameMarkup), new Markup(multiplierMarkup));
-            }
-
-            AnsiConsole.Clear();
-            AnsiConsole.Render(orderTable);
-            return AnsiConsole.Prompt(new SelectionPrompt<string>().AddChoices(Selections.AddRemoveSelections));
-        }
-
-        public string GetName(string name, List<string> existing)
+        public string GetName(string name, IEnumerable<string> existing)
         {
             AnsiConsole.Clear();
             return AnsiConsole.Prompt(
                 new TextPrompt<string>($"Enter a name for the {name}")
                     .Validate(name => existing.Contains(name) ?
                         ValidationResult.Error($"[red]A {name} with the same name already exists[/]") :
-                        ValidationResult.Success()));
-        }
-
-        public double GetNum(string name, string intName) {
-            AnsiConsole.Clear();
-            return AnsiConsole.Prompt(
-                new TextPrompt<double>($"Enter a {intName} for the {name}")
-                    .Validate(num => num <= 0 ?
-                        ValidationResult.Error($"[red]The value must be greater than zero[/]") :
                         ValidationResult.Success()));
         }
 
@@ -237,15 +174,22 @@ namespace OrderPizza
             List<string> selections = AnsiConsole.Prompt(prompt).ToList();
             if (selections.Count > 0)
             {
-                SelectionPrompt<string> confirmPrompt = new SelectionPrompt<string>()
-                    .Title("[bold red]Removing an item will result in deleting all the saved orders[/]")
-                    .AddChoices(Selections.OkBackSelections);
-                if (AnsiConsole.Prompt(confirmPrompt) == Selections.Back)
+                if (Confirm("Removing an item will result in deleting all the saved orders"))
                 {
-                    return new();
+                    return selections;
                 }
             }
-            return selections;
+            return new();
         }
+
+        public double GetNumber(string name, string intName) {
+            AnsiConsole.Clear();
+            return AnsiConsole.Prompt(
+                new TextPrompt<double>($"Enter a {intName} for the {name}")
+                    .Validate(num => num <= 0 ?
+                        ValidationResult.Error($"[red]The value must be greater than zero[/]") :
+                        ValidationResult.Success()));
+        }
+
     }
 }

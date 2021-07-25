@@ -15,12 +15,12 @@ namespace OrderPizza
         public const string RemovePizza = "Remove Pizza";
         public const string NewOrder = "New Order";
         public const string SaveOrder = "Save Order";
-        public const string LoadOrder = "Load Order";
-        public const string DeleteOrder = "Delete Order";
+        public const string LoadSavedOrder = "Load Saved Order";
+        public const string DeleteSavedOrder = "Delete Saved Orders";
         public const string Settings = "Settings";
         public const string Quit = "Quit";
         public static List<string> MainMenuSelections = new List<string>
-            { AddPizza, RemovePizza, NewOrder, SaveOrder, LoadOrder, DeleteOrder, Settings, Quit };
+            { AddPizza, RemovePizza, NewOrder, SaveOrder, LoadSavedOrder, DeleteSavedOrder, Settings, Quit };
         #endregion
 
         #region SettingsMenuSelections

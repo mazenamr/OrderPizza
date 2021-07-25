@@ -30,16 +30,16 @@ namespace OrderPizza
                         RemovePizza();
                         break;
                     case Selections.NewOrder:
-                        NewOrder();
+                        Order = new();
                         break;
                     case Selections.SaveOrder:
                         SaveOrder();
                         break;
-                    case Selections.LoadOrder:
+                    case Selections.LoadSavedOrder:
                         LoadOrder();
                         break;
-                    case Selections.DeleteOrder:
-                        DeleteOrder();
+                    case Selections.DeleteSavedOrder:
+                        DeleteSavedOrders();
                         break;
                     case Selections.Settings:
                         Settings();
@@ -54,29 +54,42 @@ namespace OrderPizza
         {
             if (Config.Pizzas.Count == 0)
             {
-                _display.NotAvailable("pizzas", "available");
+                _display.Error("No pizzas available\nAdd new pizzas from settings");
                 return;
             }
             if (Config.Sizes.Count == 0)
             {
-                _display.NotAvailable("sizes", "available");
+                _display.Error("No sizes available\nAdd new sizes from settings");
                 return;
             }
-            Pizza? pizza = Config.GetPizza(_display.GetPizza(Config.Pizzas));
+
+            string pizzaChoice = _display.ChooseWithPrice(
+                Config.Pizzas.Select(x => (x.Name, x.Price)));
+            Pizza? pizza = Config.GetPizza(pizzaChoice);
+
             if (pizza is null)
+            {
                 return;
-            List<Topping> toppings = new();
+            }
+
+            List<string> toppingChoices = _display.ChooseMultipleWithPrice(
+                Config.Toppings.Select(x => (x.Name, x.Price)));
+            List<Topping> toppings = Config.GetToppings(toppingChoices);
+
             if (Config.Toppings.Count == 0)
             {
-                _display.NotAvailable("toppings", "available");
+                _display.Error("No toppings available\nAdd new toppings from settings");
             }
-            else
-            {
-                toppings = Config.GetToppings(_display.GetToppings(Config.Toppings));
-            }
-            Size? size = Config.GetSize(_display.GetSize(Config.Sizes, Models.GetPrice(pizza, toppings)));
+
+            string sizeChoice = _display.ChooseWithPrice(
+                Config.Sizes.Select(x => (x.Name, Models.GetPrice(pizza, toppings, x))));
+            Size? size = Config.GetSize(sizeChoice);
+
             if (size is null)
+            {
                 return;
+            }
+
             Order.Items.Add(new(pizza, toppings, size));
         }
 
@@ -84,17 +97,12 @@ namespace OrderPizza
         {
             if (Order.Items.Count == 0)
             {
-                _display.NotAvailable("pizzas", "added to cart");
+                _display.Error("The cart is empty");
             }
             else
             {
                 Order.Items.RemoveAt(_display.GetItem(Order.Items));
             }
-        }
-
-        private void NewOrder()
-        {
-            Order = new();
         }
 
         private void SaveOrder()
@@ -104,23 +112,17 @@ namespace OrderPizza
                 Directory.CreateDirectory(Config.OrdersPath);
             }
 
-            string name = $"{_display.GetOrderName(Config.OrdersPath)}.json";
+            string name = $"{_display.GetName("order", Order.GetSavedOrders(Config.OrdersPath))}.json";
             Order.SaveOrder(Path.Combine(Config.OrdersPath, name));
+            Order = new();
         }
 
         private void LoadOrder()
         {
-            if (!Directory.Exists(Config.OrdersPath))
-            {
-                Directory.CreateDirectory(Config.OrdersPath);
-            }
-
-            List<string> orders = Directory.GetFiles(Config.OrdersPath, "*.json")
-                .Select(x => Path.GetFileName(x)).ToList();
-
+            List<string> orders = Order.GetSavedOrders(Config.OrdersPath);
             if (orders.Count == 0)
             {
-                _display.NotAvailable("orders", "saved");
+                _display.Error("No saved orders found");
             }
             else
             {
@@ -140,25 +142,22 @@ namespace OrderPizza
             }
         }
 
-        private void DeleteOrder()
+        private void DeleteSavedOrders()
         {
-            if (!Directory.Exists(Config.OrdersPath))
-            {
-                Directory.CreateDirectory(Config.OrdersPath);
-            }
-
-            List<string> orders = Directory.GetFiles(Config.OrdersPath, "*.json")
-                .Select(x => Path.GetFileName(x)).ToList();
-
+            List<string> orders = Order.GetSavedOrders(Config.OrdersPath);
             if (orders.Count == 0)
             {
-                _display.NotAvailable("orders", "saved");
+                _display.Error("No saved orders found");
             }
             else
             {
                 string? selected = _display.GetOrder(orders);
                 selected = orders
                     .Where(x => x.StartsWith(selected)).FirstOrDefault();
+                if (!_display.Confirm("You can't recover the saved order once it's deleted"))
+                {
+                    return;
+                }
                 if (selected is null)
                 {
                     return;
@@ -171,88 +170,56 @@ namespace OrderPizza
         {
             while (true)
             {
-                switch (_display.SettingsMenu())
+                switch (_display.Choose(Selections.SettingsMenuSelections))
                 {
                     case Selections.EditPizzas:
-                        EditPizzas();
+                        Config.Pizzas = EditList("Pizza", "Price", Config.Pizzas.ToList<Component>())
+                            .Select(x => new Pizza(x.Name, x.Price)).ToList();
                         break;
                     case Selections.EditToppings:
-                        EditToppings();
+                        Config.Toppings = EditList("Topping", "Price", Config.Toppings.ToList<Component>())
+                            .Select(x => new Topping(x.Name, x.Price)).ToList();
                         break;
                     case Selections.EditSizes:
-                        EditSizes();
+                        Config.Sizes = EditList("Size", "Multiplier", Config.Sizes.ToList<Component>())
+                            .Select(x => new Size(x.Name, x.Price)).ToList();
                         break;
                     default:
                         return;
                 }
+                _configProvider.SaveConfig();
             }
         }
 
-        private void EditPizzas()
+        private List<Component> EditList(string itemName, string priceName, List<Component> list)
         {
             while (true)
             {
-                switch (_display.EditPizzas(Config.Pizzas))
+                switch (_display.EditComponent(list.Select(x => (x.Name, x.Price)), itemName, priceName))
                 {
                     case Selections.Add:
-                        NewPizza();
+                        AddToList(itemName, priceName, list);
                         break;
                     case Selections.Remove:
-                        DeletePizza();
+                        RemoveFromList(list);
                         break;
                     default:
-                        return;
+                        return list;
                 }
             }
         }
 
-        private void EditToppings()
+        private void AddToList(string itemName, string priceName, List<Component> list)
         {
-            while (true)
-            {
-                switch (_display.EditToppings(Config.Toppings))
-                {
-                    case Selections.Add:
-                        NewTopping();
-                        break;
-                    case Selections.Remove:
-                        DeleteTopping();
-                        break;
-                    default:
-                        return;
-                }
-            }
-        }
-
-        private void EditSizes()
-        {
-            while (true)
-            {
-                switch (_display.EditSizes(Config.Sizes))
-                {
-                    case Selections.Add:
-                        NewSize();
-                        break;
-                    case Selections.Remove:
-                        DeleteSize();
-                        break;
-                    default:
-                        return;
-                }
-            }
-        }
-
-        private void NewPizza()
-        {
-            string name = _display.GetName("pizza", Config.Pizzas.Select(x => x.Name).ToList());
-            double price = _display.GetNum("pizza", "price");
-            Config.Pizzas.Add(new Pizza(name, price));
+            string name = _display.GetName(itemName, list.Select(x => x.Name));
+            double price = _display.GetNumber(itemName, priceName);
+            list.Add(new Component(name, price));
             _configProvider.SaveConfig();
         }
 
-        private void DeletePizza()
+        private void RemoveFromList(List<Component> list)
         {
-            List<string> names = _display.GetNames(Config.Pizzas.Select(x => x.Name).ToList());
+            List<string> names = _display.GetNames(list.Select(x => x.Name).ToList());
             if (names.Count > 0)
             {
                 Order = new();
@@ -261,53 +228,7 @@ namespace OrderPizza
                     Directory.Delete(Config.OrdersPath, true);
                 }
             }
-            Config.Pizzas.RemoveAll(x => names.Contains(x.Name));
-            _configProvider.SaveConfig();
-        }
-
-        private void NewTopping()
-        {
-            string name = _display.GetName("topping", Config.Toppings.Select(x => x.Name).ToList());
-            double price = _display.GetNum("topping", "price");
-            Config.Toppings.Add(new Topping(name, price));
-            _configProvider.SaveConfig();
-        }
-
-        private void DeleteTopping()
-        {
-            List<string> names = _display.GetNames(Config.Toppings.Select(x => x.Name).ToList());
-            if (names.Count > 0)
-            {
-                Order = new();
-                if (Directory.Exists(Config.OrdersPath))
-                {
-                    Directory.Delete(Config.OrdersPath, true);
-                }
-            }
-            Config.Toppings.RemoveAll(x => names.Contains(x.Name));
-            _configProvider.SaveConfig();
-        }
-
-        private void NewSize()
-        {
-            string name = _display.GetName("size", Config.Sizes.Select(x => x.Name).ToList());
-            double multiplier = _display.GetNum("size", "multiplier");
-            Config.Sizes.Add(new Size(name, multiplier));
-            _configProvider.SaveConfig();
-        }
-
-        private void DeleteSize()
-        {
-            List<string> names = _display.GetNames(Config.Sizes.Select(x => x.Name).ToList());
-            if (names.Count > 0)
-            {
-                Order = new();
-                if (Directory.Exists(Config.OrdersPath))
-                {
-                    Directory.Delete(Config.OrdersPath, true);
-                }
-            }
-            Config.Sizes.RemoveAll(x => names.Contains(x.Name));
+            list.RemoveAll(x => names.Contains(x.Name));
             _configProvider.SaveConfig();
         }
     }

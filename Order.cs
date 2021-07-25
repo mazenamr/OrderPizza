@@ -23,5 +23,18 @@ namespace OrderPizza
             }
             return null;
         }
+
+        public static List<string> GetSavedOrders(string path)
+        {
+            if (!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+                return new();
+            }
+
+            List<string> orders = Directory.GetFiles(path, "*.json")
+                .Select(x => Path.GetFileName(x)).ToList();
+            return orders;
+        }
     }
 }

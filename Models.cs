@@ -3,9 +3,11 @@ using System.Linq;
 
 namespace OrderPizza
 {
-    public record Pizza(string Name, double Price);
-    public record Topping(string Name, double Price);
-    public record Size(string Name, double Multiplier);
+    public record Component(string Name, double Price);
+
+    public record Pizza(string Name, double Price) : Component(Name, Price);
+    public record Topping(string Name, double Price) : Component(Name, Price);
+    public record Size(string Name, double Multiplier) : Component(Name, Multiplier);
 
     class Models
     {
