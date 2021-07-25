@@ -256,7 +256,10 @@ namespace OrderPizza
             if (names.Count > 0)
             {
                 Order = new();
-                Directory.Delete(Config.OrdersPath, true);
+                if (Directory.Exists(Config.OrdersPath))
+                {
+                    Directory.Delete(Config.OrdersPath, true);
+                }
             }
             Config.Pizzas.RemoveAll(x => names.Contains(x.Name));
             _configProvider.SaveConfig();
@@ -276,7 +279,10 @@ namespace OrderPizza
             if (names.Count > 0)
             {
                 Order = new();
-                Directory.Delete(Config.OrdersPath, true);
+                if (Directory.Exists(Config.OrdersPath))
+                {
+                    Directory.Delete(Config.OrdersPath, true);
+                }
             }
             Config.Toppings.RemoveAll(x => names.Contains(x.Name));
             _configProvider.SaveConfig();
@@ -296,7 +302,10 @@ namespace OrderPizza
             if (names.Count > 0)
             {
                 Order = new();
-                Directory.Delete(Config.OrdersPath, true);
+                if (Directory.Exists(Config.OrdersPath))
+                {
+                    Directory.Delete(Config.OrdersPath, true);
+                }
             }
             Config.Sizes.RemoveAll(x => names.Contains(x.Name));
             _configProvider.SaveConfig();
